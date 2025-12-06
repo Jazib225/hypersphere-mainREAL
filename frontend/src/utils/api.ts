@@ -9,6 +9,7 @@ export interface Payment {
   created_at: string;
   updated_at: string;
   tx_signature: string | null;
+  explorer_url?: string | null;
   merchant_id?: string;
   currency?: string;
   tip_amount?: number;

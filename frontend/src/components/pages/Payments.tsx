@@ -121,17 +121,22 @@ export function Payments() {
   }, []); // Only run once on mount
 
   // Transform table payments to display format (only show tablePayments, not allPayments)
-  const displayPayments = tablePayments.map((payment) => ({
-    id: payment.id,
-    time: formatDateTime(payment.created_at),
-    amount: formatAmount(payment.amount),
-    rawAmount: payment.amount, // Store raw amount for filtering
-    chain: payment.chain || (payment.currency === "USDC" ? "SOL" : payment.currency || "SOL"),
-    tip: formatAmount(payment.tip_amount || 0),
-    signature: formatTxSignature(payment.tx_signature),
-    status: "Confirmed", // All payments are confirmed
-    tx_signature: payment.tx_signature,
-  }));
+  const displayPayments = tablePayments.map((payment) => {
+    const chain = payment.chain || (payment.currency === "USDC" ? "SOL" : payment.currency || "SOL");
+    return {
+      id: payment.id,
+      time: formatDateTime(payment.created_at),
+      amount: formatAmount(payment.amount),
+      rawAmount: payment.amount, // Store raw amount for filtering
+      chain: chain,
+      tip: formatAmount(payment.tip_amount || 0),
+      signature: formatTxSignature(payment.tx_signature),
+      status: "Confirmed", // All payments are confirmed
+      tx_signature: payment.tx_signature,
+      // Use explorer_url from transaction if available, otherwise generate it
+      explorer_url: payment.explorer_url || getExplorerUrl(chain, payment.tx_signature),
+    };
+  });
 
   const filteredPayments = displayPayments.filter((payment) => {
     // Chain filtering - compare normalized values
@@ -334,7 +339,7 @@ export function Payments() {
                   </td>
                   <td className="px-6 py-4">
                     <a
-                      href={getExplorerUrl(payment.chain, payment.tx_signature)}
+                      href={payment.explorer_url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[#00E7FF] hover:text-[#3457FF] transition-colors cursor-pointer"

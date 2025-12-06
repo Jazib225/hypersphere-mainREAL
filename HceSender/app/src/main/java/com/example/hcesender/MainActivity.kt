@@ -515,142 +515,60 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-    private fun sendPaymentToBackend(baseAmount: Double, transactionHash: String? = null, source: String = "UNKNOWN") {
-        // Send payment data to backend in a background thread
-        // IMPORTANT: baseAmount is the BASE amount (before tip), NOT the total
-        thread {
-            try {
-                Log.d(TAG, "═══════════════════════════════════════")
-                Log.d(TAG, "📤 SENDING PAYMENT TO BACKEND")
-                Log.d(TAG, "  Source: $source")
-                Log.d(TAG, "  Transaction Hash: ${transactionHash ?: "N/A"}")
-                Log.d(TAG, "  Base Amount: $$baseAmount")
-                Log.d(TAG, "  Tip: $$tipAmount")
-                Log.d(TAG, "  Total: $${baseAmount + tipAmount}")
-                Log.d(TAG, "  Chain: ${selectedChain.name}")
-                Log.d(TAG, "  Merchant ID: $MERCHANT_ID")
-                Log.d(TAG, "  Timestamp: ${System.currentTimeMillis()}")
-                Log.d(TAG, "═══════════════════════════════════════")
-                
-                // First, create a payment intent
-                val createUrl = URL("$BACKEND_URL/payment_intents")
-                val createConnection = createUrl.openConnection() as HttpURLConnection
-                createConnection.requestMethod = "POST"
-                createConnection.setRequestProperty("Content-Type", "application/json")
-                createConnection.doOutput = true
-
-                val createPayload = JSONObject().apply {
-                    put("amount", baseAmount) // Send BASE amount, not total
-                    put("merchant_id", MERCHANT_ID) // Use merchant ID, not wallet address
-                    put("currency", "USDC")
-                    put("tip_amount", tipAmount)
-                    put("chain", selectedChain.name)
-                }
-
-                OutputStreamWriter(createConnection.outputStream).use { writer ->
-                    writer.write(createPayload.toString())
-                    writer.flush()
-                }
-
-                val createResponseCode = createConnection.responseCode
-                if (createResponseCode == HttpURLConnection.HTTP_CREATED) {
-                    val response = createConnection.inputStream.bufferedReader().readText()
-                    val responseJson = JSONObject(response)
-                    val paymentIntentId = responseJson.getString("id")
-                    
-                    Log.d(TAG, "✅ Payment intent created: $paymentIntentId")
-                    
-                    // Simulate transaction confirmation (in real scenario, this would come from Solana)
-                    // Generate a fake transaction signature for demo purposes
-                    val txSignature = generateMockTxSignature()
-                    
-                    // Confirm the payment intent
-                    val confirmUrl = URL("$BACKEND_URL/payment_intents/$paymentIntentId/confirm")
-                    val confirmConnection = confirmUrl.openConnection() as HttpURLConnection
-                    confirmConnection.requestMethod = "POST"
-                    confirmConnection.setRequestProperty("Content-Type", "application/json")
-                    confirmConnection.doOutput = true
-
-                    val confirmPayload = JSONObject().apply {
-                        put("tx_signature", txSignature)
-                    }
-
-                    OutputStreamWriter(confirmConnection.outputStream).use { writer ->
-                        writer.write(confirmPayload.toString())
-                        writer.flush()
-                    }
-
-                    val confirmResponseCode = confirmConnection.responseCode
-                    if (confirmResponseCode == HttpURLConnection.HTTP_OK) {
-                        Log.d(TAG, "✓ Payment confirmed successfully with signature: $txSignature")
-                        
-                        // Send complete transaction notification to backend with all details
-                        // IMPORTANT: Send BASE amount (not total) so backend stores correct base amount
-                        sendTransactionNotification(
-                            paymentIntentId = paymentIntentId,
-                            amount = baseAmount, // Send BASE amount, not total
-                            chain = selectedChain.name,
-                            tipAmount = tipAmount,
-                            txSignature = txSignature
-                        )
-                    } else {
-                        Log.e(TAG, "Failed to confirm payment: HTTP $confirmResponseCode")
-                    }
-                } else {
-                    Log.e(TAG, "Failed to create payment intent: HTTP $createResponseCode")
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error sending payment to backend", e)
-            }
-        }
-    }
-    
-    private fun generateMockTxSignature(): String {
-        // Generate a realistic-looking Solana transaction signature (base58 format)
-        val chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-        return (1..88).map { chars.random() }.joinToString("")
-    }
-    
     /**
-     * Send complete transaction notification to backend with all transaction details
-     * This ensures the transaction is properly recorded with Time, Amount (BASE), Chain, Tip, and Signature
-     * IMPORTANT: amount parameter is the BASE amount (before tip), NOT the total
+     * SIMPLIFIED: Direct single POST to record transaction
+     * Called once when tap-to-pay transaction is confirmed
+     * Captures all dynamic data: amount, tip, chain, timestamp, signature
      */
-    private fun sendTransactionNotification(
-        paymentIntentId: String,
-        amount: Double, // BASE amount (before tip)
-        chain: String,
-        tipAmount: Double,
-        txSignature: String
-    ) {
+    private fun sendPaymentToBackend(baseAmount: Double, transactionHash: String? = null, source: String = "UNKNOWN") {
         thread {
             try {
+                // Capture all transaction data at this moment
+                val txTimestamp = System.currentTimeMillis()
+                val txChain = selectedChain.name
+                val txTipAmount = tipAmount
+                val txTotalAmount = baseAmount + txTipAmount
+                val txSignature = generateMockTxSignature()
+                val txExplorerUrl = getExplorerUrl(txChain, txSignature)
+                
                 Log.d(TAG, "═══════════════════════════════════════")
-                Log.d(TAG, "📤 SENDING TRANSACTION NOTIFICATION")
-                Log.d(TAG, "  ID: $paymentIntentId")
-                Log.d(TAG, "  Base Amount: $$amount")
-                Log.d(TAG, "  Tip: $$tipAmount")
-                Log.d(TAG, "  Total: $${amount + tipAmount}")
-                Log.d(TAG, "  Chain: $chain")
-                Log.d(TAG, "  Signature: ${txSignature.take(20)}...")
+                Log.d(TAG, "📤 RECORDING TAP-TO-PAY TRANSACTION")
+                Log.d(TAG, "  Source: $source")
+                Log.d(TAG, "  Base Amount: $$baseAmount USDC")
+                Log.d(TAG, "  Tip Amount: $$txTipAmount USDC")
+                Log.d(TAG, "  Total Amount: $$txTotalAmount USDC")
+                Log.d(TAG, "  Chain: $txChain")
+                Log.d(TAG, "  Merchant ID: $MERCHANT_ID")
+                Log.d(TAG, "  Timestamp: $txTimestamp")
+                Log.d(TAG, "  TX Signature: ${txSignature.take(20)}...")
+                Log.d(TAG, "  Explorer URL: $txExplorerUrl")
                 Log.d(TAG, "═══════════════════════════════════════")
                 
+                // Single direct POST to /transactions/notify
                 val notifyUrl = URL("$BACKEND_URL/transactions/notify")
                 val connection = notifyUrl.openConnection() as HttpURLConnection
                 connection.requestMethod = "POST"
                 connection.setRequestProperty("Content-Type", "application/json")
+                connection.connectTimeout = 10000 // 10 second timeout
+                connection.readTimeout = 10000
                 connection.doOutput = true
 
+                // Build payload with all transaction data
                 val payload = JSONObject().apply {
-                    put("payment_intent_id", paymentIntentId)
+                    put("payment_intent_id", "tap-${txTimestamp}") // Unique ID based on timestamp
                     put("merchant_id", MERCHANT_ID)
-                    put("amount", amount)
-                    put("chain", chain)
+                    put("amount", baseAmount) // Base amount (before tip)
+                    put("tip_amount", txTipAmount)
+                    put("chain", txChain)
                     put("currency", "USDC")
-                    put("tip_amount", tipAmount)
                     put("tx_signature", txSignature)
+                    put("explorer_url", txExplorerUrl)
                     put("status", "paid")
+                    put("source", source) // Track if NFC or Test URL
                 }
+
+                Log.d(TAG, "📡 Sending to: $notifyUrl")
+                Log.d(TAG, "📦 Payload: $payload")
 
                 OutputStreamWriter(connection.outputStream).use { writer ->
                     writer.write(payload.toString())
@@ -658,33 +576,75 @@ class MainActivity : AppCompatActivity() {
                 }
 
                 val responseCode = connection.responseCode
+                Log.d(TAG, "📬 Response code: $responseCode")
+                
                 if (responseCode == HttpURLConnection.HTTP_CREATED || responseCode == HttpURLConnection.HTTP_OK) {
                     val response = connection.inputStream.bufferedReader().readText()
-                    Log.d(TAG, "✓✓✓ TRANSACTION NOTIFICATION SENT SUCCESSFULLY ✓✓✓")
+                    Log.d(TAG, "✅✅✅ TRANSACTION RECORDED SUCCESSFULLY ✅✅✅")
                     Log.d(TAG, "  Response: $response")
-                    Log.d(TAG, "  Transaction ID: $paymentIntentId")
-                    Log.d(TAG, "  Amount: $$amount USDC")
-                    Log.d(TAG, "  Chain: $chain")
-                    Log.d(TAG, "  Tip: $$tipAmount")
-                    Log.d(TAG, "  Signature: ${txSignature.take(20)}...")
-                    Log.d(TAG, "✓✓✓ Transaction should appear in frontend within 10 seconds ✓✓✓")
+                    Log.d(TAG, "  Base: $$baseAmount | Tip: $$txTipAmount | Total: $$txTotalAmount")
+                    Log.d(TAG, "  Chain: $txChain")
+                    Log.d(TAG, "  Explorer: $txExplorerUrl")
+                    Log.d(TAG, "✅✅✅ Check dashboard - transaction should appear instantly! ✅✅✅")
                     
-                    // Show success toast
                     runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Transaction recorded! Check dashboard.", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "✓ Transaction recorded! \$$txTotalAmount $txChain", Toast.LENGTH_LONG).show()
                     }
                 } else {
-                    val errorResponse = connection.errorStream?.bufferedReader()?.readText() ?: "Unknown error"
-                    Log.e(TAG, "❌ Failed to send transaction notification: HTTP $responseCode")
+                    val errorResponse = try {
+                        connection.errorStream?.bufferedReader()?.readText() ?: "Unknown error"
+                    } catch (e: Exception) {
+                        "Could not read error: ${e.message}"
+                    }
+                    Log.e(TAG, "❌ FAILED TO RECORD TRANSACTION")
+                    Log.e(TAG, "  HTTP Code: $responseCode")
                     Log.e(TAG, "  Error: $errorResponse")
+                    Log.e(TAG, "  Check: Is backend running? Is phone on same network?")
                     
                     runOnUiThread {
-                        Toast.makeText(this@MainActivity, "Failed to record transaction: $responseCode", Toast.LENGTH_LONG).show()
+                        Toast.makeText(this@MainActivity, "❌ Failed: HTTP $responseCode - Check network", Toast.LENGTH_LONG).show()
                     }
                 }
+            } catch (e: java.net.ConnectException) {
+                Log.e(TAG, "❌ CONNECTION FAILED - Backend not reachable")
+                Log.e(TAG, "  URL: $BACKEND_URL")
+                Log.e(TAG, "  Error: ${e.message}")
+                Log.e(TAG, "  Check: Is backend running? Is phone on same WiFi as computer?")
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "❌ Can't connect to backend - check WiFi", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: java.net.SocketTimeoutException) {
+                Log.e(TAG, "❌ CONNECTION TIMEOUT")
+                Log.e(TAG, "  URL: $BACKEND_URL")
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "❌ Connection timeout - check network", Toast.LENGTH_LONG).show()
+                }
             } catch (e: Exception) {
-                Log.e(TAG, "Error sending transaction notification", e)
+                Log.e(TAG, "❌ ERROR RECORDING TRANSACTION", e)
+                runOnUiThread {
+                    Toast.makeText(this@MainActivity, "❌ Error: ${e.message}", Toast.LENGTH_LONG).show()
+                }
             }
+        }
+    }
+    
+    /**
+     * Generate mock transaction signature (base58 format like Solana)
+     */
+    private fun generateMockTxSignature(): String {
+        val chars = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+        return (1..88).map { chars.random() }.joinToString("")
+    }
+    
+    /**
+     * Get blockchain explorer URL based on chain and transaction signature
+     */
+    private fun getExplorerUrl(chain: String, txSignature: String): String {
+        return when (chain.uppercase()) {
+            "SOL", "SOLANA" -> "https://solscan.io/tx/$txSignature"
+            "ETH", "ETHEREUM" -> "https://etherscan.io/tx/$txSignature"
+            "BASE" -> "https://basescan.org/tx/$txSignature"
+            else -> "https://solscan.io/tx/$txSignature" // Default to Solana
         }
     }
 

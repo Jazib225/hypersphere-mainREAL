@@ -597,14 +597,19 @@ app.post('/transactions/notify', async (req, res) => {
       currency,
       tip_amount,
       tx_signature,
+      explorer_url,
       status,
+      source,
     } = req.body;
 
-    if (!payment_intent_id || !merchant_id || !amount) {
+    if (!merchant_id || amount === undefined) {
       return res.status(400).json({
-        error: 'Missing required fields: payment_intent_id, merchant_id, amount',
+        error: 'Missing required fields: merchant_id, amount',
       });
     }
+    
+    // Generate explorer URL if not provided
+    const finalExplorerUrl = explorer_url || generateExplorerUrl(chain || 'SOL', tx_signature);
 
     // CRITICAL FIX: Generate a NEW transaction ID for each payment
     // Don't reuse payment_intent_id - each payment should be a NEW transaction
@@ -641,11 +646,13 @@ app.post('/transactions/notify', async (req, res) => {
       currency: currency || 'USDC',
       tip_amount: tip_amount || 0,
       tx_signature: tx_signature || null,
+      explorer_url: finalExplorerUrl,
       status: status || 'paid', // Default to paid when notification is sent
       created_at: now, // Always use current timestamp for new transaction
       updated_at: now,
-      // Store payment_intent_id as metadata for reference
-      payment_intent_id: payment_intent_id,
+      // Store metadata for reference
+      payment_intent_id: payment_intent_id || `tap-${timestamp}`,
+      source: source || 'unknown',
     });
     
     // Verify transaction was stored correctly
@@ -690,11 +697,14 @@ app.post('/transactions/notify', async (req, res) => {
       currency: transaction.currency,
       tip_amount: transaction.tip_amount,
       tx_signature: transaction.tx_signature,
+      explorer_url: transaction.explorer_url,
       status: transaction.status,
       created_at: transaction.created_at,
       updated_at: transaction.updated_at,
     };
     broadcastNewTransaction(merchant_id, broadcastPayload);
+    
+    console.log(`  Explorer: ${transaction.explorer_url}`);
 
     // Start watching for payment confirmation if not already paid
     if (status !== 'paid' && tx_signature) {
@@ -879,6 +889,28 @@ app.post('/api/test-transaction', (req, res) => {
 function generateTestTxSignature() {
   const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
   return Array.from({length: 88}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+}
+
+/**
+ * Generate blockchain explorer URL based on chain and transaction signature
+ */
+function generateExplorerUrl(chain, txSignature) {
+  if (!txSignature) return null;
+  
+  const chainUpper = (chain || 'SOL').toUpperCase();
+  
+  switch (chainUpper) {
+    case 'SOL':
+    case 'SOLANA':
+      return `https://solscan.io/tx/${txSignature}`;
+    case 'ETH':
+    case 'ETHEREUM':
+      return `https://etherscan.io/tx/${txSignature}`;
+    case 'BASE':
+      return `https://basescan.org/tx/${txSignature}`;
+    default:
+      return `https://solscan.io/tx/${txSignature}`;
+  }
 }
 
 /**

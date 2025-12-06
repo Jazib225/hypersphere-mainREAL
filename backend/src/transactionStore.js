@@ -18,9 +18,12 @@ export function storeTransaction(transaction) {
     currency,
     tip_amount,
     tx_signature,
+    explorer_url,
     status,
     created_at,
     updated_at,
+    payment_intent_id,
+    source,
   } = transaction;
 
   // Check if transaction already exists
@@ -35,10 +38,14 @@ export function storeTransaction(transaction) {
     currency: currency || existing?.currency || 'USDC',
     tip_amount: tip_amount !== undefined ? tip_amount : (existing?.tip_amount || 0),
     tx_signature: tx_signature || existing?.tx_signature || null,
+    explorer_url: explorer_url || existing?.explorer_url || null,
     status: status || existing?.status || 'confirmed',
     // Preserve original created_at if updating, otherwise use new timestamp
     created_at: existing?.created_at || created_at || now,
     updated_at: updated_at || now,
+    // Additional metadata
+    payment_intent_id: payment_intent_id || existing?.payment_intent_id || null,
+    source: source || existing?.source || null,
   };
 
   transactions.set(txData.id, txData);
