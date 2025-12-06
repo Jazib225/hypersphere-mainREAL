@@ -1,0 +1,288 @@
+openapi: 3.0.0
+info:
+  title: Tap-to-Pay Backend API
+  description: Solana tap-to-pay payment processing backend
+  version: 1.0.0
+  contact:
+    name: API Support
+
+servers:
+  - url: http://localhost:3001
+    description: Local development
+  - url: https://api.example.com
+    description: Production
+
+paths:
+  /health:
+    get:
+      summary: Server health check
+      operationId: getHealth
+      tags:
+        - Health
+      responses:
+        '200':
+          description: Server is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /payment_intents:
+    post:
+      summary: Create a new payment intent
+      operationId: createPaymentIntent
+      tags:
+        - Payment Intents
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - amount
+                - merchant_id
+              properties:
+                amount:
+                  type: integer
+                  description: Amount in lamports
+                  example: 1000000
+                merchant_id:
+                  type: string
+                  description: Merchant identifier
+                  example: merchant-001
+      responses:
+        '201':
+          description: Payment intent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentIntent'
+        '400':
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /payment_intents/{id}/status:
+    get:
+      summary: Get payment intent status
+      operationId: getPaymentStatus
+      tags:
+        - Payment Intents
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Payment intent ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentStatus'
+        '404':
+          description: Payment intent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /pay/{id}:
+    get:
+      summary: Get payment page details
+      operationId: getPaymentPage
+      tags:
+        - Payments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Payment intent ID
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Payment page details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentPage'
+        '404':
+          description: Payment intent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /merchants/{id}/payments:
+    get:
+      summary: Get all payments for a merchant (dashboard)
+      operationId: getMerchantPayments
+      tags:
+        - Merchants
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Merchant ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Merchant payments retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MerchantPayments'
+        '404':
+          description: Merchant not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+components:
+  schemas:
+    PaymentIntent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique payment intent ID
+        amount:
+          type: integer
+          description: Amount in lamports
+        merchant_id:
+          type: string
+          description: Merchant identifier
+        nonce:
+          type: string
+          description: Random 32-byte nonce (hex encoded)
+        payment_url:
+          type: string
+          format: uri
+          description: URL for payment page
+
+    PaymentStatus:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, paid, failed]
+          description: Current payment status
+        tx_signature:
+          type: string
+          nullable: true
+          description: Solana transaction signature (null if pending)
+        amount:
+          type: integer
+          description: Amount in lamports
+        merchant_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PaymentPage:
+      type: object
+      properties:
+        paymentIntentId:
+          type: string
+          format: uuid
+        amount:
+          type: integer
+        nonce:
+          type: string
+          description: Hex-encoded 32-byte nonce
+        merchant_id:
+          type: string
+        programId:
+          type: string
+          description: Solana program ID (base58)
+
+    MerchantPayments:
+      type: object
+      properties:
+        merchant_id:
+          type: string
+        total_count:
+          type: integer
+          description: Total number of payments
+        payments:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+                format: uuid
+              amount:
+                type: integer
+              status:
+                type: string
+                enum: [pending, paid, failed]
+              created_at:
+                type: string
+                format: date-time
+              updated_at:
+                type: string
+                format: date-time
+              tx_signature:
+                type: string
+                nullable: true
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        statusCode:
+          type: integer
+          description: HTTP status code
+
+tags:
+  - name: Health
+    description: Server health check endpoints
+  - name: Payment Intents
+    description: Payment intent management
+  - name: Payments
+    description: Payment processing
+  - name: Merchants
+    description: Merchant dashboard

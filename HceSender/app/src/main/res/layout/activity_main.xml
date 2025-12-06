@@ -1,0 +1,626 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F5F5F5">
+
+    <!-- Main Card Container with ScrollView -->
+    <androidx.cardview.widget.CardView
+        android:id="@+id/mainCard"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:cardCornerRadius="16dp"
+        app:cardElevation="8dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="12dp">
+
+        <ScrollView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:fillViewport="true"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- Header Section with Amount -->
+                <LinearLayout
+                    android:id="@+id/headerLayout"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="@drawable/header_gradient"
+                    android:padding="24dp"
+                    android:gravity="center">
+
+                    <TextView
+                        android:id="@+id/amountLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Base Amount"
+                        android:textColor="#BBDEFB"
+                        android:textSize="12sp"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/amountText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="$0.00"
+                        android:textColor="#FFFFFF"
+                        android:textSize="40sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.02"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:padding="8dp" />
+                    
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Tap to edit"
+                        android:textColor="#90CAF9"
+                        android:textSize="11sp"
+                        android:layout_marginTop="2dp" />
+                </LinearLayout>
+
+                <!-- Chain Selection Section -->
+                <LinearLayout
+                    android:id="@+id/chainSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:background="#FAFAFA">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Select Chain"
+                        android:textColor="#212121"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="12dp"
+                        android:layout_gravity="center_horizontal" />
+
+                    <!-- Chain Buttons Row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center">
+
+                        <!-- ETH Button -->
+                        <LinearLayout
+                            android:id="@+id/ethButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="12dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/chain_button_background"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="44dp"
+                                android:layout_height="44dp"
+                                android:src="@drawable/logo_eth"
+                                android:scaleType="fitCenter"
+                                android:adjustViewBounds="true"
+                                android:layout_marginBottom="6dp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="ETH"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="#627EEA" />
+                        </LinearLayout>
+
+                        <!-- SOL Button -->
+                        <LinearLayout
+                            android:id="@+id/solButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="12dp"
+                            android:layout_marginStart="6dp"
+                            android:layout_marginEnd="6dp"
+                            android:background="@drawable/chain_button_background"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="44dp"
+                                android:layout_height="44dp"
+                                android:src="@drawable/logo_sol"
+                                android:scaleType="fitCenter"
+                                android:adjustViewBounds="true"
+                                android:layout_marginBottom="6dp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="SOL"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="#14F195" />
+                        </LinearLayout>
+
+                        <!-- BASE Button -->
+                        <LinearLayout
+                            android:id="@+id/baseButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical"
+                            android:gravity="center"
+                            android:padding="12dp"
+                            android:layout_marginStart="6dp"
+                            android:background="@drawable/chain_button_background"
+                            android:clickable="true"
+                            android:focusable="true">
+
+                            <ImageView
+                                android:layout_width="44dp"
+                                android:layout_height="44dp"
+                                android:src="@drawable/logo_base"
+                                android:scaleType="fitCenter"
+                                android:adjustViewBounds="true"
+                                android:layout_marginBottom="6dp" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="BASE"
+                                android:textSize="12sp"
+                                android:textStyle="bold"
+                                android:textColor="#0052FF" />
+                        </LinearLayout>
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Tip Section -->
+                <LinearLayout
+                    android:id="@+id/tipSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="16dp"
+                    android:background="#FFFFFF">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Add Tip"
+                        android:textColor="#212121"
+                        android:textSize="14sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="10dp"
+                        android:layout_gravity="center_horizontal" />
+
+                    <!-- Tip Buttons Row -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:layout_marginBottom="10dp">
+
+                        <Button
+                            android:id="@+id/tip10Button"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="10%"
+                            android:textSize="13sp"
+                            android:backgroundTint="#E3F2FD"
+                            android:textColor="#1976D2"
+                            android:layout_marginEnd="6dp"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                        <Button
+                            android:id="@+id/tip15Button"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="15%"
+                            android:textSize="13sp"
+                            android:backgroundTint="#E3F2FD"
+                            android:textColor="#1976D2"
+                            android:layout_marginEnd="6dp"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                        <Button
+                            android:id="@+id/tip18Button"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="18%"
+                            android:textSize="13sp"
+                            android:backgroundTint="#E3F2FD"
+                            android:textColor="#1976D2"
+                            android:layout_marginEnd="6dp"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+
+                        <Button
+                            android:id="@+id/tip20Button"
+                            android:layout_width="0dp"
+                            android:layout_height="48dp"
+                            android:layout_weight="1"
+                            android:text="20%"
+                            android:textSize="13sp"
+                            android:backgroundTint="#E3F2FD"
+                            android:textColor="#1976D2"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton" />
+                    </LinearLayout>
+
+                    <!-- Tip Amount Display -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        android:background="#F5F5F5"
+                        android:layout_marginBottom="8dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Tip Amount:"
+                            android:textColor="#757575"
+                            android:textSize="13sp"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="6dp" />
+
+                        <TextView
+                            android:id="@+id/tipAmountText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="$0.00"
+                            android:textColor="#4CAF50"
+                            android:textSize="14sp"
+                            android:textStyle="bold"
+                            android:paddingEnd="12dp"
+                            android:paddingStart="6dp" />
+                    </LinearLayout>
+
+                    <!-- Total Amount Display -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center"
+                        android:paddingTop="10dp"
+                        android:paddingBottom="10dp"
+                        android:background="#1976D2"
+                        android:elevation="2dp">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="TOTAL:"
+                            android:textColor="#FFFFFF"
+                            android:textSize="16sp"
+                            android:textStyle="bold"
+                            android:paddingStart="12dp"
+                            android:paddingEnd="6dp" />
+
+                        <TextView
+                            android:id="@+id/totalAmountText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="$0.00"
+                            android:textColor="#FFFFFF"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:paddingEnd="12dp"
+                            android:paddingStart="6dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Main Content Area (States) -->
+                <FrameLayout
+                    android:id="@+id/contentArea"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp">
+
+                    <!-- Idle State -->
+                    <LinearLayout
+                        android:id="@+id/idleState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:visibility="visible">
+
+                        <!-- Tap Area -->
+                        <androidx.cardview.widget.CardView
+                            android:id="@+id/tapArea"
+                            android:layout_width="200dp"
+                            android:layout_height="200dp"
+                            app:cardCornerRadius="20dp"
+                            app:cardElevation="2dp"
+                            app:cardBackgroundColor="#E3F2FD"
+                            android:layout_marginBottom="16dp">
+
+                            <LinearLayout
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:orientation="vertical"
+                                android:gravity="center"
+                                android:background="@drawable/tap_area_background"
+                                android:padding="16dp">
+
+                                <ImageView
+                                    android:id="@+id/phoneIcon"
+                                    android:layout_width="60dp"
+                                    android:layout_height="60dp"
+                                    android:src="@android:drawable/ic_dialog_info"
+                                    android:tint="#1976D2"
+                                    android:layout_marginBottom="12dp"
+                                    android:scaleType="centerInside" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Hold card or device\nnear screen"
+                                    android:textColor="#0D47A1"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold"
+                                    android:gravity="center"
+                                    android:layout_marginBottom="6dp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Tap to simulate"
+                                    android:textColor="#1976D2"
+                                    android:textSize="11sp"
+                                    android:gravity="center" />
+                            </LinearLayout>
+                        </androidx.cardview.widget.CardView>
+
+                        <!-- Instructions -->
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:gravity="center_vertical"
+                            android:padding="12dp">
+
+                            <ImageView
+                                android:layout_width="18dp"
+                                android:layout_height="18dp"
+                                android:src="@android:drawable/ic_dialog_info"
+                                android:tint="#1976D2"
+                                android:layout_marginEnd="10dp" />
+
+                            <LinearLayout
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:orientation="vertical">
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="Contactless payment"
+                                    android:textColor="#212121"
+                                    android:textSize="13sp"
+                                    android:textStyle="bold" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:text="NFC-enabled devices"
+                                    android:textColor="#757575"
+                                    android:textSize="11sp" />
+                            </LinearLayout>
+                        </LinearLayout>
+                    </LinearLayout>
+
+                    <!-- Processing State -->
+                    <LinearLayout
+                        android:id="@+id/processingState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="32dp"
+                        android:visibility="gone">
+
+                        <ProgressBar
+                            android:id="@+id/processingSpinner"
+                            android:layout_width="80dp"
+                            android:layout_height="80dp"
+                            android:indeterminateTint="#1976D2"
+                            android:layout_marginBottom="20dp" />
+
+                        <TextView
+                            android:id="@+id/processingText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Processing payment..."
+                            android:textColor="#212121"
+                            android:textSize="15sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="6dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Please wait"
+                            android:textColor="#757575"
+                            android:textSize="13sp" />
+                    </LinearLayout>
+
+                    <!-- Success State -->
+                    <LinearLayout
+                        android:id="@+id/successState"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:padding="32dp"
+                        android:visibility="gone">
+
+                        <ImageView
+                            android:id="@+id/successIcon"
+                            android:layout_width="96dp"
+                            android:layout_height="96dp"
+                            android:src="@drawable/ic_check_circle"
+                            android:layout_marginBottom="20dp"
+                            android:scaleType="fitCenter"
+                            android:alpha="0.0"
+                            android:scaleX="0.0"
+                            android:scaleY="0.0" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Payment Successful"
+                            android:textColor="#4CAF50"
+                            android:textSize="20sp"
+                            android:textStyle="bold"
+                            android:layout_marginBottom="6dp" />
+
+                        <TextView
+                            android:id="@+id/successAmount"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="$0.00 charged"
+                            android:textColor="#757575"
+                            android:textSize="14sp"
+                            android:layout_marginBottom="4dp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Transaction complete"
+                            android:textColor="#9E9E9E"
+                            android:textSize="11sp" />
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- Debug/Test Section -->
+                <LinearLayout
+                    android:id="@+id/debugSection"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#F5F5F5"
+                    android:padding="12dp"
+                    android:layout_marginTop="8dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔧 Test Payment URL"
+                        android:textColor="#757575"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:id="@+id/debugUrlText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Select chain and amount to generate URL..."
+                        android:textColor="#424242"
+                        android:textSize="10sp"
+                        android:fontFamily="monospace"
+                        android:background="#FFFFFF"
+                        android:padding="8dp"
+                        android:layout_marginBottom="8dp"
+                        android:maxLines="3"
+                        android:scrollbars="vertical" />
+
+                    <!-- Test Mode Toggle - Hidden (removed functionality) -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="8dp"
+                        android:background="#FFF3E0"
+                        android:layout_marginBottom="8dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="🧪 Test Mode (Use Test Wallets)"
+                            android:textColor="#E65100"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
+
+                        <Switch
+                            android:id="@+id/testModeSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:checked="false" />
+                    </LinearLayout>
+
+                    <Button
+                        android:id="@+id/testUrlButton"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Test Open URL (Simulate NFC Tap)"
+                        android:textSize="12sp"
+                        android:backgroundTint="#4CAF50"
+                        android:layout_marginBottom="4dp" />
+
+                    <TextView
+                        android:id="@+id/debugInfoText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textColor="#757575"
+                        android:textSize="10sp"
+                        android:layout_marginTop="4dp" />
+                </LinearLayout>
+
+                <!-- Footer -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:background="#FAFAFA"
+                    android:padding="12dp"
+                    android:gravity="center">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Secured by encryption"
+                        android:textColor="#9E9E9E"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+            </LinearLayout>
+        </ScrollView>
+    </androidx.cardview.widget.CardView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

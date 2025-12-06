@@ -1,0 +1,8 @@
+[programs.localnet]
+tap_to_pay = "replace-with-program-id"
+
+[provider]
+cluster = "localnet"
+
+[registry]
+url = "https://anchor.projectserum.com"

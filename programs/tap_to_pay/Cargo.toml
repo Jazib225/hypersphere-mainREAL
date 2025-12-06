@@ -1,0 +1,11 @@
+[package]
+name = "tap_to_pay"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "tap_to_pay"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+anchor-lang = "0.30.0"

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Professional Tap-to-Pay Color Scheme -->
+    <color name="primary_blue">#1E88E5</color>
+    <color name="primary_blue_dark">#1565C0</color>
+    <color name="accent_green">#4CAF50</color>
+    <color name="background_light">#F5F5F5</color>
+    <color name="card_background">#FFFFFF</color>
+    <color name="text_primary">#212121</color>
+    <color name="text_secondary">#757575</color>
+    <color name="divider">#E0E0E0</color>
+    <color name="error_red">#F44336</color>
+    <color name="success_green">#4CAF50</color>
+    <color name="nfc_indicator">#1E88E5</color>
+</resources>
+

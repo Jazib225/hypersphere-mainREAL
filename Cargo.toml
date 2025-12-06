@@ -1,0 +1,2 @@
+[workspace]
+members = ["programs/tap_to_pay"]
