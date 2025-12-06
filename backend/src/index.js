@@ -493,6 +493,7 @@ app.get('/merchants/:id/payments', async (req, res) => {
         created_at: p.created_at,
         updated_at: p.updated_at,
         tx_signature: p.tx_signature,
+        explorer_url: p.explorer_url || generateExplorerUrl(p.chain || 'SOL', p.tx_signature),
       })),
     }));
   } catch (error) {

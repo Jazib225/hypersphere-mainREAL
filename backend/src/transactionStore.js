@@ -131,6 +131,34 @@ export function seedSampleTransactions(merchantId = '4UznnYY4AMzAmss6AqeAvqUs5Ke
   // This ensures sample data is always in the past and new transactions appear at top
   const sampleTransactions = [];
   
+  // Add the specific $0.05 USDC SOL transaction at the TOP with 12:45 PM EST timestamp
+  // 12:45 PM EST = 17:45 UTC (EST is UTC-5)
+  // Use today's date at 12:45 PM EST
+  const today = new Date();
+  const estYear = today.getFullYear();
+  const estMonth = today.getMonth();
+  const estDay = today.getDate();
+  // Create date for 12:45 PM EST, then convert to UTC
+  const estDate = new Date(Date.UTC(estYear, estMonth, estDay, 17, 45, 0, 0)); // 12:45 PM EST = 5:45 PM UTC
+  const specificTransactionTime = estDate.toISOString();
+  
+  const specificTransaction = {
+    id: 'top-transaction-0.05-sol',
+    merchant_id: merchantId,
+    amount: 0.05,
+    chain: 'SOL',
+    currency: 'USDC',
+    tip_amount: 0.01,
+    tx_signature: '5ZqmkJAxQQR8Y4cs6fERRMFWngfCxzSAbDD6v3dBDRiini3EzrPUfKRo7kkAigRKuM2pAJCNy5jgUFmYTfrSDPJB',
+    explorer_url: 'https://solscan.io/tx/5ZqmkJAxQQR8Y4cs6fERRMFWngfCxzSAbDD6v3dBDRiini3EzrPUfKRo7kkAigRKuM2pAJCNy5jgUFmYTfrSDPJB',
+    status: 'paid',
+    created_at: specificTransactionTime, // 12:45 PM EST
+    updated_at: specificTransactionTime,
+    source: 'MANUAL_TOP'
+  };
+  sampleTransactions.push(specificTransaction);
+  storeTransaction(specificTransaction);
+  
   for (let day = 1; day < 14; day++) {  // Start from day 1 (yesterday) not day 0 (today)
     const date = new Date(now);
     date.setDate(now.getDate() - day);
