@@ -3,6 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { v4 as uuidv4, validate as validateUUID } from 'uuid';
 import crypto from 'crypto';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 // Database imports removed
 import {
   getConnection,
@@ -26,6 +28,46 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3001;
 const BASE_URL = process.env.BASE_URL || 'http://localhost:3001';
+
+// Create HTTP server and attach Socket.IO
+const httpServer = http.createServer(app);
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Socket.IO connection handler
+io.on('connection', (socket) => {
+  console.log(`🔌 Client connected: ${socket.id}`);
+
+  // Join merchant-specific room for targeted broadcasts
+  socket.on('join:merchant', (merchantId) => {
+    socket.join(`merchant:${merchantId}`);
+    console.log(`📊 Client ${socket.id} joined merchant room: ${merchantId}`);
+  });
+
+  // Leave merchant room
+  socket.on('leave:merchant', (merchantId) => {
+    socket.leave(`merchant:${merchantId}`);
+    console.log(`📊 Client ${socket.id} left merchant room: ${merchantId}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`🔌 Client disconnected: ${socket.id}`);
+  });
+});
+
+/**
+ * Broadcast new transaction to all connected clients for a merchant
+ */
+function broadcastNewTransaction(merchantId, transaction) {
+  console.log(`📡 Broadcasting transaction:new to merchant:${merchantId}`);
+  io.to(`merchant:${merchantId}`).emit('transaction:new', transaction);
+  // Also broadcast to all clients (for debugging/global dashboards)
+  io.emit('transaction:any', transaction);
+}
 
 // Middleware
 app.use(cors());
@@ -637,7 +679,22 @@ app.post('/transactions/notify', async (req, res) => {
       console.error(`  ❌ ERROR: Transaction NOT found in merchant list!`);
     }
     
-    console.log(`✓✓✓ Transaction will appear in frontend within 5 seconds ✓✓✓\n`);
+    console.log(`✓✓✓ Broadcasting to frontend via WebSocket NOW ✓✓✓\n`);
+
+    // Broadcast to all connected clients for this merchant IMMEDIATELY
+    const broadcastPayload = {
+      id: transaction.id,
+      merchant_id: transaction.merchant_id,
+      amount: transaction.amount,
+      chain: transaction.chain,
+      currency: transaction.currency,
+      tip_amount: transaction.tip_amount,
+      tx_signature: transaction.tx_signature,
+      status: transaction.status,
+      created_at: transaction.created_at,
+      updated_at: transaction.updated_at,
+    };
+    broadcastNewTransaction(merchant_id, broadcastPayload);
 
     // Start watching for payment confirmation if not already paid
     if (status !== 'paid' && tx_signature) {
@@ -757,8 +814,72 @@ app.get('/merchants/:id/wallet/:chain', async (req, res) => {
  * Health check endpoint
  */
 app.get('/health', (req, res) => {
-  res.json({ status: 'ok' });
+  res.json({ status: 'ok', websocket: 'enabled' });
 });
+
+/**
+ * POST /api/test-transaction
+ * Create a test transaction (for debugging real-time updates)
+ */
+app.post('/api/test-transaction', (req, res) => {
+  try {
+    const merchantId = req.body.merchant_id || '4UznnYY4AMzAmss6AqeAvqUs5KeWYNinzKE2uFFQZ16U';
+    const amount = req.body.amount || 0.06;
+    const chain = req.body.chain || 'SOL';
+    const tipAmount = req.body.tip_amount || 0.01;
+    
+    const transactionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const txSignature = generateTestTxSignature();
+    
+    const transaction = storeTransaction({
+      id: transactionId,
+      merchant_id: merchantId,
+      amount: parseFloat(amount),
+      chain: chain,
+      currency: 'USDC',
+      tip_amount: parseFloat(tipAmount),
+      tx_signature: txSignature,
+      status: 'paid',
+      created_at: now,
+      updated_at: now,
+    });
+    
+    console.log(`\\n🧪 TEST TRANSACTION CREATED`);
+    console.log(`  ID: ${transactionId}`);
+    console.log(`  Amount: $${amount} ${chain}`);
+    console.log(`  Tip: $${tipAmount}`);
+    console.log(`  Broadcasting to WebSocket...`);
+    
+    // Broadcast to WebSocket clients
+    broadcastNewTransaction(merchantId, {
+      id: transaction.id,
+      merchant_id: transaction.merchant_id,
+      amount: transaction.amount,
+      chain: transaction.chain,
+      currency: transaction.currency,
+      tip_amount: transaction.tip_amount,
+      tx_signature: transaction.tx_signature,
+      status: transaction.status,
+      created_at: transaction.created_at,
+      updated_at: transaction.updated_at,
+    });
+    
+    res.status(201).json({
+      success: true,
+      message: 'Test transaction created and broadcast',
+      transaction: transaction
+    });
+  } catch (error) {
+    console.error('Error creating test transaction:', error);
+    res.status(500).json({ error: 'Failed to create test transaction' });
+  }
+});
+
+function generateTestTxSignature() {
+  const chars = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  return Array.from({length: 88}, () => chars.charAt(Math.floor(Math.random() * chars.length))).join('');
+}
 
 /**
  * GET /debug/transactions
@@ -877,12 +998,14 @@ async function start() {
   try {
     await initialize();
 
-    const server = app.listen(PORT, () => {
+    const server = httpServer.listen(PORT, () => {
       console.log(`\n🚀 Backend server running on http://localhost:${PORT}`);
+      console.log('🔌 WebSocket enabled for real-time updates');
       console.log('Endpoints:');
       console.log('  POST   /payment_intents');
       console.log('  GET    /payment_intents/:id/status');
       console.log('  GET    /merchants/:id/payments');
+      console.log('  POST   /transactions/notify (broadcasts to WebSocket)');
       console.log('  GET    /health\n');
     });
 

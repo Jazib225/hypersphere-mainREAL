@@ -1,20 +1,61 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { io, Socket } from "socket.io-client";
 import { fetchMerchantPayments, formatAmount, type Payment } from "../../utils/api";
 
 // Merchant ID - update this with your actual merchant wallet address
 const MERCHANT_ID = "4UznnYY4AMzAmss6AqeAvqUs5KeWYNinzKE2uFFQZ16U";
 
+// Backend URL for WebSocket
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
+
 export function Analytics() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [wsConnected, setWsConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
-  // Fetch payments from backend
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    console.log("📊 Analytics: Connecting to WebSocket...");
+    
+    const socket = io(API_BASE_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+    
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log("✅ Analytics: WebSocket connected!");
+      setWsConnected(true);
+      socket.emit('join:merchant', MERCHANT_ID);
+    });
+
+    socket.on('disconnect', () => {
+      console.log("❌ Analytics: WebSocket disconnected");
+      setWsConnected(false);
+    });
+
+    // Listen for new transactions (real-time)
+    socket.on('transaction:new', (tx: Payment) => {
+      console.log("📊 Analytics: New transaction received:", tx.id);
+      setPayments(prev => [tx, ...prev]);
+    });
+
+    return () => {
+      socket.emit('leave:merchant', MERCHANT_ID);
+      socket.disconnect();
+    };
+  }, []);
+
+  // Initial load from backend
   useEffect(() => {
     async function loadPayments() {
       try {
         const data = await fetchMerchantPayments(MERCHANT_ID);
-        // Always replace with fresh data from backend (ensures new transactions appear)
         setPayments(data.payments || []);
       } catch (err) {
         console.error("Failed to load payments:", err);
@@ -24,10 +65,6 @@ export function Analytics() {
     }
 
     loadPayments();
-    
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(loadPayments, 10000);
-    return () => clearInterval(interval);
   }, []);
 
   // Calculate daily sales for last 7 days

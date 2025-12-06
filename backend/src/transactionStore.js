@@ -120,10 +120,11 @@ export function seedSampleTransactions(merchantId = '4UznnYY4AMzAmss6AqeAvqUs5Ke
   const chains = ['SOL', 'ETH', 'BASE'];
   const statuses = ['paid', 'confirmed', 'paid', 'paid', 'confirmed']; // Mix of statuses
   
-  // Generate transactions for the last 14 days
+  // Generate transactions for the last 14 days (starting from day 1, not today)
+  // This ensures sample data is always in the past and new transactions appear at top
   const sampleTransactions = [];
   
-  for (let day = 0; day < 14; day++) {
+  for (let day = 1; day < 14; day++) {  // Start from day 1 (yesterday) not day 0 (today)
     const date = new Date(now);
     date.setDate(now.getDate() - day);
     

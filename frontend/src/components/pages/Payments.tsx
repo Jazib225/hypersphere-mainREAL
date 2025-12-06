@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { io, Socket } from "socket.io-client";
 import { fetchMerchantPayments, formatAmount, formatDateTime, formatTxSignature, getExplorerUrl, type Payment } from "../../utils/api";
 
 // Merchant ID - update this with your actual merchant wallet address
@@ -6,6 +7,9 @@ const MERCHANT_ID = "4UznnYY4AMzAmss6AqeAvqUs5KeWYNinzKE2uFFQZ16U";
 
 // Maximum number of transactions to show in the table
 const MAX_TABLE_TRANSACTIONS = 20;
+
+// Backend URL for WebSocket
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
 export function Payments() {
   // Keep ALL payments for graphs/analytics
@@ -18,9 +22,80 @@ export function Payments() {
   const [dateRange, setDateRange] = useState<string>("Today");
   const [tipFilter, setTipFilter] = useState<string>("All");
   const [amountRange, setAmountRange] = useState<string>("All");
-  const [lastTransactionId, setLastTransactionId] = useState<string | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+  const socketRef = useRef<Socket | null>(null);
 
-  // Fetch payments from backend
+  // WebSocket connection for real-time updates
+  useEffect(() => {
+    console.log("🔌 Connecting to WebSocket...");
+    
+    const socket = io(API_BASE_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
+    });
+    
+    socketRef.current = socket;
+
+    socket.on('connect', () => {
+      console.log("✅ WebSocket connected!");
+      setWsConnected(true);
+      // Join merchant room
+      socket.emit('join:merchant', MERCHANT_ID);
+      console.log(`📊 Joined merchant room: ${MERCHANT_ID}`);
+    });
+
+    socket.on('disconnect', () => {
+      console.log("❌ WebSocket disconnected");
+      setWsConnected(false);
+    });
+
+    // Listen for new transactions (real-time)
+    socket.on('transaction:new', (tx: Payment) => {
+      console.log("🚀 REAL-TIME TRANSACTION RECEIVED!");
+      console.log("   ID:", tx.id);
+      console.log("   Amount: $" + tx.amount, tx.chain);
+      console.log("   Tip: $" + (tx.tip_amount || 0));
+      console.log("   Time:", tx.created_at);
+      console.log("   Signature:", tx.tx_signature?.substring(0, 20) + "...");
+      
+      // Add to all payments (with deduplication)
+      setAllPayments(prev => {
+        // Check if already exists
+        if (prev.some(p => p.id === tx.id)) {
+          console.log("   ⚠️ Duplicate in allPayments, skipping");
+          return prev;
+        }
+        return [tx, ...prev];
+      });
+      
+      // Add to table (newest at top, with deduplication)
+      setTablePayments(prev => {
+        // Check if already exists
+        if (prev.some(p => p.id === tx.id)) {
+          console.log("   ⚠️ Duplicate in tablePayments, skipping");
+          return prev;
+        }
+        const updated = [tx, ...prev];
+        // Keep only MAX
+        return updated.slice(0, MAX_TABLE_TRANSACTIONS);
+      });
+    });
+
+    // Also listen for any transaction (debug)
+    socket.on('transaction:any', (tx: Payment) => {
+      console.log("📡 transaction:any event received:", tx.id);
+    });
+
+    return () => {
+      console.log("🔌 Disconnecting WebSocket...");
+      socket.emit('leave:merchant', MERCHANT_ID);
+      socket.disconnect();
+    };
+  }, []);
+
+  // Initial load from backend (HTTP)
   useEffect(() => {
     async function loadPayments() {
       try {
@@ -28,51 +103,10 @@ export function Payments() {
         const data = await fetchMerchantPayments(MERCHANT_ID);
         const newPayments = data.payments || [];
         
-        // Update all payments (for graphs - keeps all transactions)
+        // Initial load: populate both arrays
         setAllPayments(newPayments);
-        
-        // Check if there's a new transaction (by comparing latest ID)
-        const latestTransactionId = newPayments.length > 0 ? newPayments[0]?.id : null;
-        const hasNewTransaction = latestTransactionId && latestTransactionId !== lastTransactionId;
-        
-        // Initial load or new transaction detected
-        if (lastTransactionId === null && newPayments.length > 0) {
-          // Initial load: populate table with latest transactions
-          const initialTable = newPayments.slice(0, MAX_TABLE_TRANSACTIONS);
-          setTablePayments(initialTable);
-          setLastTransactionId(newPayments[0]?.id || null);
-          console.log(`📊 Initial load: ${initialTable.length} transactions in table`);
-        } else if (hasNewTransaction && latestTransactionId) {
-          console.log(`🆕 NEW TRANSACTION DETECTED!`);
-          console.log(`   ID: ${latestTransactionId}`);
-          console.log(`   Amount: $${newPayments[0]?.amount} ${newPayments[0]?.chain}`);
-          console.log(`   Tip: $${newPayments[0]?.tip_amount || 0}`);
-          console.log(`   Time: ${newPayments[0]?.created_at}`);
-          
-          // Update table: add new transaction to top, remove bottom if exceeds max
-          setTablePayments(prev => {
-            // Add new transaction to the top
-            const updated = [newPayments[0], ...prev];
-            
-            // Remove duplicates (in case same transaction appears twice)
-            const unique = updated.filter((tx, index, self) => 
-              index === self.findIndex(t => t.id === tx.id)
-            );
-            
-            // Keep only MAX_TABLE_TRANSACTIONS (remove bottom ones)
-            const limited = unique.slice(0, MAX_TABLE_TRANSACTIONS);
-            
-            const wasAtMax = prev.length >= MAX_TABLE_TRANSACTIONS;
-            console.log(`   ✅ Added to table (${limited.length}/${MAX_TABLE_TRANSACTIONS})`);
-            if (wasAtMax) {
-              console.log(`   🗑️ Removed oldest transaction from table (still in graphs)`);
-            }
-            
-            return limited;
-          });
-          
-          setLastTransactionId(latestTransactionId);
-        }
+        setTablePayments(newPayments.slice(0, MAX_TABLE_TRANSACTIONS));
+        console.log(`📊 Initial load: ${newPayments.length} total, ${Math.min(newPayments.length, MAX_TABLE_TRANSACTIONS)} in table`);
         
         setError(null);
       } catch (err) {
@@ -83,13 +117,8 @@ export function Payments() {
       }
     }
 
-    // Load immediately
     loadPayments();
-    
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(loadPayments, 10000);
-    return () => clearInterval(interval);
-  }, [lastTransactionId]); // Only depend on lastTransactionId to avoid infinite loops
+  }, []); // Only run once on mount
 
   // Transform table payments to display format (only show tablePayments, not allPayments)
   const displayPayments = tablePayments.map((payment) => ({
