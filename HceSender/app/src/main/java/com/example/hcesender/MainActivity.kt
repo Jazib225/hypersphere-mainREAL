@@ -75,7 +75,8 @@ class MainActivity : AppCompatActivity() {
         const val DEFAULT_AMOUNT = "0.01"
         
         // Backend API endpoint (update this with your actual backend URL)
-        const val BACKEND_URL = "http://10.0.2.2:3001" // Use 10.0.2.2 for Android emulator to access localhost
+        // Use 10.0.2.2 for Android emulator, or your computer's local IP for real device
+        const val BACKEND_URL = "http://172.20.3.86:3001" // Your computer's local IP for real phone
     }
 
     enum class PaymentState {
