@@ -27,8 +27,8 @@ export function Overview() {
 
     loadPayments();
     
-    // Auto-refresh every 5 seconds for faster updates
-    const interval = setInterval(loadPayments, 5000);
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(loadPayments, 10000);
     return () => clearInterval(interval);
   }, []);
 

@@ -4,14 +4,21 @@ import { fetchMerchantPayments, formatAmount, formatDateTime, formatTxSignature,
 // Merchant ID - update this with your actual merchant wallet address
 const MERCHANT_ID = "4UznnYY4AMzAmss6AqeAvqUs5KeWYNinzKE2uFFQZ16U";
 
+// Maximum number of transactions to show in the table
+const MAX_TABLE_TRANSACTIONS = 20;
+
 export function Payments() {
-  const [payments, setPayments] = useState<Payment[]>([]);
+  // Keep ALL payments for graphs/analytics
+  const [allPayments, setAllPayments] = useState<Payment[]>([]);
+  // Only show MAX_TABLE_TRANSACTIONS in the table (newest at top)
+  const [tablePayments, setTablePayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [chainFilter, setChainFilter] = useState<string>("All");
   const [dateRange, setDateRange] = useState<string>("Today");
   const [tipFilter, setTipFilter] = useState<string>("All");
   const [amountRange, setAmountRange] = useState<string>("All");
+  const [lastTransactionId, setLastTransactionId] = useState<string | null>(null);
 
   // Fetch payments from backend
   useEffect(() => {
@@ -19,17 +26,55 @@ export function Payments() {
       try {
         setLoading(true);
         const data = await fetchMerchantPayments(MERCHANT_ID);
+        const newPayments = data.payments || [];
         
-        // Always replace with fresh data from backend (backend returns all transactions)
-        // This ensures we have the latest state including new transactions
-        setPayments(data.payments || []);
-        setError(null);
+        // Update all payments (for graphs - keeps all transactions)
+        setAllPayments(newPayments);
         
-        // Log when new transactions are loaded
-        if (data.payments && data.payments.length > 0) {
-          console.log(`📊 Loaded ${data.payments.length} transactions`);
-          console.log(`   Latest: ${data.payments[0]?.id} - $${data.payments[0]?.amount} ${data.payments[0]?.chain}`);
+        // Check if there's a new transaction (by comparing latest ID)
+        const latestTransactionId = newPayments.length > 0 ? newPayments[0]?.id : null;
+        const hasNewTransaction = latestTransactionId && latestTransactionId !== lastTransactionId;
+        
+        // Initial load or new transaction detected
+        if (lastTransactionId === null && newPayments.length > 0) {
+          // Initial load: populate table with latest transactions
+          const initialTable = newPayments.slice(0, MAX_TABLE_TRANSACTIONS);
+          setTablePayments(initialTable);
+          setLastTransactionId(newPayments[0]?.id || null);
+          console.log(`📊 Initial load: ${initialTable.length} transactions in table`);
+        } else if (hasNewTransaction && latestTransactionId) {
+          console.log(`🆕 NEW TRANSACTION DETECTED!`);
+          console.log(`   ID: ${latestTransactionId}`);
+          console.log(`   Amount: $${newPayments[0]?.amount} ${newPayments[0]?.chain}`);
+          console.log(`   Tip: $${newPayments[0]?.tip_amount || 0}`);
+          console.log(`   Time: ${newPayments[0]?.created_at}`);
+          
+          // Update table: add new transaction to top, remove bottom if exceeds max
+          setTablePayments(prev => {
+            // Add new transaction to the top
+            const updated = [newPayments[0], ...prev];
+            
+            // Remove duplicates (in case same transaction appears twice)
+            const unique = updated.filter((tx, index, self) => 
+              index === self.findIndex(t => t.id === tx.id)
+            );
+            
+            // Keep only MAX_TABLE_TRANSACTIONS (remove bottom ones)
+            const limited = unique.slice(0, MAX_TABLE_TRANSACTIONS);
+            
+            const wasAtMax = prev.length >= MAX_TABLE_TRANSACTIONS;
+            console.log(`   ✅ Added to table (${limited.length}/${MAX_TABLE_TRANSACTIONS})`);
+            if (wasAtMax) {
+              console.log(`   🗑️ Removed oldest transaction from table (still in graphs)`);
+            }
+            
+            return limited;
+          });
+          
+          setLastTransactionId(latestTransactionId);
         }
+        
+        setError(null);
       } catch (err) {
         console.error("Failed to load payments:", err);
         setError("Failed to load payments. Please check if the backend is running.");
@@ -41,13 +86,13 @@ export function Payments() {
     // Load immediately
     loadPayments();
     
-    // Auto-refresh every 5 seconds for faster updates
-    const interval = setInterval(loadPayments, 5000);
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(loadPayments, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [lastTransactionId]); // Only depend on lastTransactionId to avoid infinite loops
 
-  // Transform backend payments to display format
-  const displayPayments = payments.map((payment) => ({
+  // Transform table payments to display format (only show tablePayments, not allPayments)
+  const displayPayments = tablePayments.map((payment) => ({
     id: payment.id,
     time: formatDateTime(payment.created_at),
     amount: formatAmount(payment.amount),

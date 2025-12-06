@@ -42,6 +42,11 @@ class MainActivity : AppCompatActivity() {
     private var tipAmount = 0.0
     private var totalAmount = 0.0
     
+    // Transaction deduplication: track last processed transaction
+    private var lastProcessedTransactionHash: String? = null
+    private var lastProcessedTimestamp: Long = 0
+    private var isProcessingPayment = false // Gate to prevent concurrent processing
+    
     private enum class Chain {
         ETH, SOL, BASE
     }
@@ -131,17 +136,42 @@ class MainActivity : AppCompatActivity() {
         // Update debug URL display initially
         updateDebugUrlDisplay()
 
-        // Register broadcast receiver for NFC scan events
+        // Register broadcast receiver for HCE lifecycle and NFC scan events
         nfcScanReceiver = object : BroadcastReceiver() {
             override fun onReceive(context: Context?, intent: Intent?) {
-                if (intent?.action == PaymentCardService.ACTION_NFC_SCANNED) {
-                    // NFC reader scanned the HCE sender - trigger success animation
-                    triggerPaymentSuccess()
+                when (intent?.action) {
+                    PaymentCardService.ACTION_HCE_ACTIVATED -> {
+                        Log.d(TAG, "═══════════════════════════════════════")
+                        Log.d(TAG, "🟢 HCE SERVICE ACTIVATED EVENT RECEIVED")
+                        Log.d(TAG, "  HCE sender is now active and ready")
+                        Log.d(TAG, "═══════════════════════════════════════")
+                    }
+                    PaymentCardService.ACTION_HCE_DEACTIVATED -> {
+                        val reason = intent.getIntExtra("reason", -1)
+                        Log.d(TAG, "═══════════════════════════════════════")
+                        Log.d(TAG, "🔴 HCE SERVICE DEACTIVATED EVENT RECEIVED")
+                        Log.d(TAG, "  Reason: $reason")
+                        Log.d(TAG, "═══════════════════════════════════════")
+                    }
+                    PaymentCardService.ACTION_NFC_SCANNED -> {
+                        val timestamp = intent.getLongExtra("timestamp", System.currentTimeMillis())
+                        Log.d(TAG, "═══════════════════════════════════════")
+                        Log.d(TAG, "📱 NFC SCAN EVENT RECEIVED")
+                        Log.d(TAG, "  Timestamp: $timestamp")
+                        Log.d(TAG, "  Calling unified payment handler...")
+                        Log.d(TAG, "═══════════════════════════════════════")
+                        // Use unified payment handler
+                        handlePaymentSuccess("NFC_TAP", timestamp)
+                    }
                 }
             }
         }
 
-        val filter = IntentFilter(PaymentCardService.ACTION_NFC_SCANNED)
+        val filter = IntentFilter().apply {
+            addAction(PaymentCardService.ACTION_NFC_SCANNED)
+            addAction(PaymentCardService.ACTION_HCE_ACTIVATED)
+            addAction(PaymentCardService.ACTION_HCE_DEACTIVATED)
+        }
         LocalBroadcastManager.getInstance(this).registerReceiver(nfcScanReceiver, filter)
     }
 
@@ -370,30 +400,102 @@ class MainActivity : AppCompatActivity() {
         }, 1500)
     }
 
-    private fun triggerPaymentSuccess() {
-        // Only trigger if currently idle or processing
-        if (currentState == PaymentState.IDLE || currentState == PaymentState.PROCESSING) {
-            setState(PaymentState.SUCCESS)
-            
-            // Update success amount text with total (including tip)
-            val formatter = NumberFormat.getCurrencyInstance(Locale.US)
-            binding.successAmount.text = "${formatter.format(totalAmount)} charged"
-            
-            // Animate checkmark appearance
-            animateSuccessCheckmark()
-            
-            // Send payment data to backend (send BASE amount, not total)
-            sendPaymentToBackend(baseAmount)
-            
-            // Reset to idle after 3 seconds
-            handler.postDelayed({
-                setState(PaymentState.IDLE)
-                // Reset tip after successful payment
-                tipPercentage = 0
-                calculateTipAndTotal()
-                updateAmountDisplays()
-            }, 3000)
+    /**
+     * Unified payment success handler - called by both NFC tap and Test URL
+     * Includes debouncing and deduplication to prevent duplicate transactions
+     */
+    private fun handlePaymentSuccess(source: String, timestamp: Long = System.currentTimeMillis()) {
+        // Generate transaction hash for deduplication
+        val transactionHash = generateTransactionHash(baseAmount, tipAmount, selectedChain.name, timestamp)
+        
+        Log.d(TAG, "═══════════════════════════════════════")
+        Log.d(TAG, "💰 UNIFIED PAYMENT HANDLER CALLED")
+        Log.d(TAG, "  Source: $source")
+        Log.d(TAG, "  Timestamp: $timestamp")
+        Log.d(TAG, "  Base Amount: $$baseAmount")
+        Log.d(TAG, "  Tip: $$tipAmount")
+        Log.d(TAG, "  Total: $$totalAmount")
+        Log.d(TAG, "  Chain: ${selectedChain.name}")
+        Log.d(TAG, "  Transaction Hash: $transactionHash")
+        Log.d(TAG, "  Is Processing: $isProcessingPayment")
+        Log.d(TAG, "  Current State: $currentState")
+        Log.d(TAG, "═══════════════════════════════════════")
+        
+        // Gate: Prevent concurrent processing
+        if (isProcessingPayment) {
+            Log.w(TAG, "⚠️ PAYMENT ALREADY PROCESSING - IGNORING DUPLICATE")
+            Log.w(TAG, "  This prevents duplicate transactions from being created")
+            return
         }
+        
+        // State check: Only process if idle or processing
+        if (currentState != PaymentState.IDLE && currentState != PaymentState.PROCESSING) {
+            Log.w(TAG, "⚠️ INVALID STATE - IGNORING")
+            Log.w(TAG, "  Current state: $currentState (expected: IDLE or PROCESSING)")
+            return
+        }
+        
+        // Deduplication: Check if this is the same transaction as last processed
+        val timeSinceLastProcess = timestamp - lastProcessedTimestamp
+        if (transactionHash == lastProcessedTransactionHash && timeSinceLastProcess < 5000) {
+            Log.w(TAG, "⚠️ DUPLICATE TRANSACTION DETECTED - IGNORING")
+            Log.w(TAG, "  Same hash as last transaction")
+            Log.w(TAG, "  Time since last: ${timeSinceLastProcess}ms (< 5s debounce)")
+            return
+        }
+        
+        // Set processing gate
+        isProcessingPayment = true
+        lastProcessedTransactionHash = transactionHash
+        lastProcessedTimestamp = timestamp
+        
+        Log.d(TAG, "✅ PAYMENT PROCESSING APPROVED")
+        Log.d(TAG, "  Setting state to SUCCESS")
+        Log.d(TAG, "  Updating UI...")
+        
+        // Update UI
+        setState(PaymentState.SUCCESS)
+        
+        // Update success amount text with total (including tip)
+        val formatter = NumberFormat.getCurrencyInstance(Locale.US)
+        binding.successAmount.text = "${formatter.format(totalAmount)} charged"
+        
+        // Animate checkmark appearance
+        animateSuccessCheckmark()
+        
+        // Send payment data to backend (send BASE amount, not total)
+        // This will create a NEW transaction each time
+        sendPaymentToBackend(baseAmount, transactionHash, source)
+        
+        // Reset to idle after 3 seconds
+        handler.postDelayed({
+            setState(PaymentState.IDLE)
+            isProcessingPayment = false // Release gate
+            // Reset tip after successful payment
+            tipPercentage = 0
+            calculateTipAndTotal()
+            updateAmountDisplays()
+            Log.d(TAG, "✅ Payment processing complete, gate released")
+        }, 3000)
+    }
+    
+    /**
+     * Generate a unique hash for transaction deduplication
+     * Combines: baseAmount, tipAmount, chain, and timestamp (rounded to nearest second)
+     */
+    private fun generateTransactionHash(baseAmount: Double, tipAmount: Double, chain: String, timestamp: Long): String {
+        // Round timestamp to nearest second to allow for slight timing differences
+        val roundedTimestamp = (timestamp / 1000) * 1000
+        val hashString = "${baseAmount}_${tipAmount}_${chain}_${roundedTimestamp}"
+        return hashString.hashCode().toString()
+    }
+    
+    /**
+     * Legacy method - now calls unified handler
+     * Kept for backward compatibility
+     */
+    private fun triggerPaymentSuccess() {
+        handlePaymentSuccess("NFC_TAP_LEGACY")
     }
     
     private fun animateSuccessCheckmark() {
@@ -412,18 +514,21 @@ class MainActivity : AppCompatActivity() {
             .start()
     }
 
-    private fun sendPaymentToBackend(baseAmount: Double) {
+    private fun sendPaymentToBackend(baseAmount: Double, transactionHash: String? = null, source: String = "UNKNOWN") {
         // Send payment data to backend in a background thread
         // IMPORTANT: baseAmount is the BASE amount (before tip), NOT the total
         thread {
             try {
                 Log.d(TAG, "═══════════════════════════════════════")
                 Log.d(TAG, "📤 SENDING PAYMENT TO BACKEND")
+                Log.d(TAG, "  Source: $source")
+                Log.d(TAG, "  Transaction Hash: ${transactionHash ?: "N/A"}")
                 Log.d(TAG, "  Base Amount: $$baseAmount")
                 Log.d(TAG, "  Tip: $$tipAmount")
                 Log.d(TAG, "  Total: $${baseAmount + tipAmount}")
                 Log.d(TAG, "  Chain: ${selectedChain.name}")
                 Log.d(TAG, "  Merchant ID: $MERCHANT_ID")
+                Log.d(TAG, "  Timestamp: ${System.currentTimeMillis()}")
                 Log.d(TAG, "═══════════════════════════════════════")
                 
                 // First, create a payment intent
@@ -755,7 +860,9 @@ class MainActivity : AppCompatActivity() {
         handler.postDelayed({
             // Record the transaction as if payment was successful
             // Send BASE amount, not total
-            sendPaymentToBackend(baseAmount)
+            // Use unified payment handler (same as NFC tap)
+            val timestamp = System.currentTimeMillis()
+            handlePaymentSuccess("TEST_URL", timestamp)
         }, 2000) // Wait 2 seconds to simulate wallet interaction
         try {
             val paymentUrl = generatePaymentUrl()
@@ -808,15 +915,16 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Opening in $walletApp ($networkName)...", Toast.LENGTH_SHORT).show()
                 Log.d(TAG, "Successfully opened URL in $walletApp")
                 
-                // IMPORTANT: Record the transaction immediately after opening wallet
-                // This captures: BASE amount, chain, tip, and creates transaction record
-                Log.d(TAG, "📝 Recording transaction: baseAmount=$$baseAmount, tip=$$tipAmount, total=$$totalAmount, chain=${selectedChain.name}")
+                // IMPORTANT: Use unified payment handler (same as NFC tap)
+                val timestamp = System.currentTimeMillis()
+                Log.d(TAG, "═══════════════════════════════════════")
+                Log.d(TAG, "🔧 TEST URL PAYMENT (ALTERNATE PATH)")
+                Log.d(TAG, "  baseAmount=$$baseAmount, tip=$$tipAmount, total=$$totalAmount")
+                Log.d(TAG, "  chain=${selectedChain.name}")
+                Log.d(TAG, "  Calling unified payment handler...")
+                Log.d(TAG, "═══════════════════════════════════════")
                 handler.postDelayed({
-                    // Send payment to backend to record the transaction
-                    // This will create payment intent and send notification with all details
-                    // IMPORTANT: Send BASE amount, not total
-                    Log.d(TAG, "🚀 Sending transaction to backend (base: $$baseAmount, tip: $$tipAmount)...")
-                    sendPaymentToBackend(baseAmount)
+                    handlePaymentSuccess("TEST_URL_ALTERNATE", timestamp)
                 }, 1500) // Wait 1.5 seconds to simulate wallet interaction
             } catch (e: android.content.ActivityNotFoundException) {
                 Toast.makeText(this, "Please install $walletApp to test this payment", Toast.LENGTH_LONG).show()

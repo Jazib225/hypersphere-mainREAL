@@ -206,11 +206,11 @@ app.post('/payment_intents', async (req, res) => {
       chain: normalizedChain,
     };
 
-    // Store transaction in memory (will be updated when payment is confirmed)
-    // IMPORTANT: Each payment intent gets a unique ID, so this creates a NEW transaction
+    // Store payment intent in memory (this is just the intent, not the final transaction)
+    // The actual transaction will be created when notification is received with a NEW ID
     const saved = storeTransaction({
       ...paymentIntent,
-      status: 'confirmed',
+      status: 'pending', // Payment intent is pending until notification creates actual transaction
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     });
@@ -219,6 +219,7 @@ app.post('/payment_intents', async (req, res) => {
     console.log(`  Amount: $${saved.amount} ${saved.currency || 'USDC'}`);
     console.log(`  Chain: ${saved.chain || 'SOL'}`);
     console.log(`  Tip: $${saved.tip_amount || 0}`);
+    console.log(`  Note: Actual transaction will be created when notification is received`);
 
     // Derive PDA for on-chain account
     let pdaAddress = null;
@@ -427,7 +428,9 @@ app.get('/merchants/:id/payments', async (req, res) => {
     const { id: merchant_id } = req.params;
 
     // Get all payments for merchant from transaction store
-    const payments = getMerchantTransactions(merchant_id);
+    // Filter out 'pending' payment intents - only show 'paid' or 'confirmed' transactions
+    const allPayments = getMerchantTransactions(merchant_id);
+    const payments = allPayments.filter(p => p.status === 'paid' || p.status === 'confirmed');
 
     console.log(`\n📊 Fetching payments for merchant: ${merchant_id}`);
     console.log(`   Found ${payments.length} transactions`);
@@ -561,15 +564,35 @@ app.post('/transactions/notify', async (req, res) => {
       });
     }
 
-    // Store or update transaction with all required fields
-    // IMPORTANT: If transaction with same ID exists, it updates it
-    // If it's a new ID, it creates a NEW transaction (appends to list)
-    const existingTx = getTransaction(payment_intent_id);
-    const isNewTransaction = !existingTx;
+    // CRITICAL FIX: Generate a NEW transaction ID for each payment
+    // Don't reuse payment_intent_id - each payment should be a NEW transaction
+    // This ensures each NFC tap or Test URL click creates a NEW entry in the table
+    const transactionId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    const timestamp = Date.now();
     
-    // Create transaction object with all required fields
+    // Additional deduplication: Check if we recently created a transaction with same amount/chain/tip
+    // This is a backend-level safety check
+    const recentTxs = getMerchantTransactions(merchant_id)
+      .filter(tx => {
+        const txTime = new Date(tx.created_at).getTime();
+        const timeDiff = timestamp - txTime;
+        return timeDiff < 2000 && // Within 2 seconds
+               tx.amount === parseFloat(amount) &&
+               tx.chain === (chain || 'SOL') &&
+               tx.tip_amount === (tip_amount || 0);
+      });
+    
+    if (recentTxs.length > 0) {
+      console.log(`\n⚠️ DUPLICATE TRANSACTION DETECTED (backend)`);
+      console.log(`  Found ${recentTxs.length} recent transaction(s) with same amount/chain/tip`);
+      console.log(`  Most recent: ${recentTxs[0].id} at ${recentTxs[0].created_at}`);
+      console.log(`  This transaction will still be created but logged for review\n`);
+    }
+    
+    // Create a NEW transaction object (never update existing)
     const transaction = storeTransaction({
-      id: payment_intent_id,
+      id: transactionId, // NEW ID for each payment
       merchant_id,
       amount: parseFloat(amount),
       chain: chain || 'SOL',
@@ -577,25 +600,28 @@ app.post('/transactions/notify', async (req, res) => {
       tip_amount: tip_amount || 0,
       tx_signature: tx_signature || null,
       status: status || 'paid', // Default to paid when notification is sent
-      created_at: existingTx?.created_at || new Date().toISOString(), // Preserve original timestamp if updating
-      updated_at: new Date().toISOString(),
+      created_at: now, // Always use current timestamp for new transaction
+      updated_at: now,
+      // Store payment_intent_id as metadata for reference
+      payment_intent_id: payment_intent_id,
     });
     
     // Verify transaction was stored correctly
-    const verifyTx = getTransaction(payment_intent_id);
+    const verifyTx = getTransaction(transactionId);
     if (!verifyTx) {
-      console.error(`❌ ERROR: Transaction ${payment_intent_id} was not stored!`);
+      console.error(`❌ ERROR: Transaction ${transactionId} was not stored!`);
       return res.status(500).json({ error: 'Failed to store transaction' });
     }
 
-    const action = isNewTransaction ? 'CREATED (NEW)' : 'UPDATED (EXISTING)';
-    console.log(`\n✓✓✓ TRANSACTION ${action} ✓✓✓`);
-    console.log(`  ID: ${payment_intent_id}`);
+    console.log(`\n✓✓✓ NEW TRANSACTION CREATED ✓✓✓`);
+    console.log(`  Transaction ID: ${transactionId}`);
+    console.log(`  Payment Intent ID: ${payment_intent_id}`);
     console.log(`  Merchant: ${merchant_id}`);
-    console.log(`  Amount: $${amount} ${currency || 'USDC'}`);
-    console.log(`  Chain: ${chain || 'SOL'}`);
+    console.log(`  Base Amount: $${amount} ${currency || 'USDC'}`);
     console.log(`  Tip: $${tip_amount || 0}`);
-    console.log(`  Signature: ${tx_signature ? tx_signature.substring(0, 20) + '...' : 'Pending'}`);
+    console.log(`  Total: $${parseFloat(amount) + (tip_amount || 0)}`);
+    console.log(`  Chain: ${chain || 'SOL'}`);
+    console.log(`  Signature: ${tx_signature ? tx_signature.substring(0, 20) + '...' : 'N/A'}`);
     console.log(`  Status: ${transaction.status}`);
     console.log(`  Time: ${transaction.created_at}`);
     
@@ -604,9 +630,9 @@ app.post('/transactions/notify', async (req, res) => {
     console.log(`  Total transactions for merchant: ${allMerchantTxs.length}`);
     
     // Verify this transaction is in the list
-    const txInList = allMerchantTxs.find(tx => tx.id === payment_intent_id);
+    const txInList = allMerchantTxs.find(tx => tx.id === transactionId);
     if (txInList) {
-      console.log(`  ✓ Transaction verified in merchant list`);
+      console.log(`  ✓ Transaction verified in merchant list (position: ${allMerchantTxs.indexOf(txInList) + 1})`);
     } else {
       console.error(`  ❌ ERROR: Transaction NOT found in merchant list!`);
     }
@@ -624,6 +650,7 @@ app.post('/transactions/notify', async (req, res) => {
       success: true,
       transaction: {
         id: transaction.id,
+        transaction_id: transactionId, // Return the new transaction ID
         merchant_id: transaction.merchant_id,
         amount: transaction.amount,
         chain: transaction.chain,

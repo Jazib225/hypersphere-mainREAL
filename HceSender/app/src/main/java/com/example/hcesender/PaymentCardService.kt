@@ -62,8 +62,10 @@ class PaymentCardService : HostApduService() {
         private const val LABEL = "Hypersphere"
         private const val MESSAGE = "Tap to Pay"
         
-        // Broadcast action for NFC scan detected
+        // Broadcast actions for HCE lifecycle and NFC events
         const val ACTION_NFC_SCANNED = "com.example.hcesender.NFC_SCANNED"
+        const val ACTION_HCE_ACTIVATED = "com.example.hcesender.HCE_ACTIVATED"
+        const val ACTION_HCE_DEACTIVATED = "com.example.hcesender.HCE_DEACTIVATED"
     }
 
     override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
@@ -78,10 +80,16 @@ class PaymentCardService : HostApduService() {
                               commandApdu[1] == 0xA4.toByte()
 
         if (isSelectCommand) {
-            Log.d(TAG, "NFC reader scanning detected - triggering success animation")
+            Log.d(TAG, "═══════════════════════════════════════")
+            Log.d(TAG, "📱 NFC READER SCAN DETECTED")
+            Log.d(TAG, "  APDU Command: SELECT (0x00 0xA4)")
+            Log.d(TAG, "  Timestamp: ${System.currentTimeMillis()}")
+            Log.d(TAG, "  Broadcasting ACTION_NFC_SCANNED")
+            Log.d(TAG, "═══════════════════════════════════════")
             
             // Send broadcast to MainActivity to trigger success animation
             val intent = Intent(ACTION_NFC_SCANNED)
+            intent.putExtra("timestamp", System.currentTimeMillis())
             LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
         }
 
@@ -210,7 +218,32 @@ class PaymentCardService : HostApduService() {
     }
 
     override fun onDeactivated(reason: Int) {
-        Log.d(TAG, "Deactivated: reason=$reason")
+        Log.d(TAG, "═══════════════════════════════════════")
+        Log.d(TAG, "🔴 HCE SERVICE DEACTIVATED")
+        Log.d(TAG, "  Reason: $reason")
+        Log.d(TAG, "  Reason codes: 0=DEACTIVATION_LINK_LOSS, 1=DEACTIVATION_DESELECTED")
+        Log.d(TAG, "═══════════════════════════════════════")
+        
+        // Broadcast deactivation event
+        val intent = Intent(ACTION_HCE_DEACTIVATED)
+        intent.putExtra("reason", reason)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
+    }
+    
+    /**
+     * Called when the HCE service is first created and ready to process APDUs
+     * This is the best place to detect HCE activation
+     */
+    override fun onCreate() {
+        super.onCreate()
+        Log.d(TAG, "═══════════════════════════════════════")
+        Log.d(TAG, "🟢 HCE SERVICE CREATED/ACTIVATED")
+        Log.d(TAG, "  Service is now ready to receive NFC commands")
+        Log.d(TAG, "═══════════════════════════════════════")
+        
+        // Broadcast activation event
+        val intent = Intent(ACTION_HCE_ACTIVATED)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
     }
 }
 
